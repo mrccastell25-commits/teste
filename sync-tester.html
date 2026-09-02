@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sync Lab — Teste de Dublagem Dupla</title>
+<style>
+  /* ── tokens ── */
+  :root {
+    --bg:        #0d0d0f;
+    --surface:   #17171b;
+    --panel:     #1f1f25;
+    --border:    rgba(255,255,255,0.08);
+    --accent:    #5b8cff;
+    --accent-dim:#2a3f7a;
+    --danger:    #ff4d4d;
+    --text:      #e8e8f0;
+    --muted:     #6b6b80;
+    --radius:    10px;
+    --mono:      'Courier New', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── header ── */
+  header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 16px; font-weight: 800; color: #fff;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 1rem; font-weight: 600; letter-spacing: -.01em; }
+  header p  { font-size: 0.78rem; color: var(--muted); }
+
+  /* ── main layout ── */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 0;
+    height: calc(100vh - 65px);
+  }
+
+  /* ── video area ── */
+  .video-area {
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .video-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .video-slot {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .video-slot-header {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .slot-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+
+  .slot-badge {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+  .badge-quality { background: rgba(91,140,255,.15); color: var(--accent); }
+  .badge-dub     { background: rgba(80,200,120,.15); color: #50c878; }
+
+  .slot-status {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .slot-status.active { color: #50c878; }
+
+  .iframe-wrapper {
+    position: relative;
+    aspect-ratio: 16/9;
+    background: #000;
+  }
+  .iframe-wrapper iframe {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    border: none;
+  }
+
+  .placeholder {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .placeholder svg { opacity: .3; }
+
+  /* ── transport bar ── */
+  .transport {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .transport-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 8px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .transport-btn:hover { background: rgba(255,255,255,.08); }
+  .transport-btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .transport-btn.primary:hover { background: #4a7be0; }
+  .transport-btn.danger {
+    background: rgba(255,77,77,.1);
+    border-color: rgba(255,77,77,.3);
+    color: var(--danger);
+  }
+  .transport-btn.danger:hover { background: rgba(255,77,77,.2); }
+  .transport-btn:disabled {
+    opacity: .35; cursor: not-allowed;
+  }
+
+  .time-display {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .time-display span { color: var(--text); }
+
+  /* ── sidebar ── */
+  .sidebar {
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .field input {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 8px 11px;
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+
+  .btn-load {
+    width: 100%;
+    padding: 9px;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 7px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn-load:hover { background: rgba(91,140,255,.25); }
+
+  /* ── sync control ── */
+  .sync-control { }
+
+  .sync-value-display {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 14px;
+    letter-spacing: -.02em;
+  }
+  .sync-value-display small {
+    font-size: 0.7rem;
+    color: var(--muted);
+    display: block;
+    font-family: system-ui;
+    font-weight: 400;
+    letter-spacing: 0;
+    margin-top: 2px;
+  }
+
+  .sync-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .sync-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(91,140,255,.2);
+  }
+  .sync-slider::-moz-range-thumb {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  .sync-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .sync-btn {
+    padding: 7px 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s;
+    text-align: center;
+  }
+  .sync-btn:hover { background: rgba(255,255,255,.07); }
+
+  .btn-reset-sync {
+    width: 100%;
+    padding: 7px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: color .12s, border-color .12s;
+  }
+  .btn-reset-sync:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
+
+  /* ── log ── */
+  .log {
+    flex: 1;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .log-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  #log-output {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    overflow-y: auto;
+    min-height: 120px;
+    max-height: 200px;
+    line-height: 1.7;
+  }
+
+  .log-entry { color: var(--muted); }
+  .log-entry.ok  { color: #50c878; }
+  .log-entry.err { color: var(--danger); }
+  .log-entry.info{ color: var(--accent); }
+
+  /* ── info strip ── */
+  .info-strip {
+    padding: 10px 20px;
+    background: rgba(91,140,255,.06);
+    border-top: 1px solid rgba(91,140,255,.15);
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .info-strip strong { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">S</div>
+  <div>
+    <h1>Sync Lab</h1>
+    <p>Teste de reprodução dual com ajuste de sincronismo</p>
+  </div>
+</header>
+
+<main>
+  <!-- ── vídeos + transport ── -->
+  <div class="video-area">
+    <div class="video-grid">
+
+      <!-- Slot A: qualidade -->
+      <div class="video-slot">
+        <div class="video-slot-header">
+          <div class="slot-label">
+            <span class="slot-badge badge-quality">HD</span>
+            Vídeo com qualidade
+          </div>
+          <span class="slot-status" id="status-a">aguardando</span>
+        </div>
+        <div class="iframe-wrapper" id="wrapper-a">
+          <div class="placeholder" id="placeholder-a">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><path d="m8 21 4-4 4 4"/><path d="M12 17v4"/>
+            </svg>
+            <span>Cole a URL e clique em Carregar</span>
+          </div>
+          <div id="player-a"></div>
+        </div>
+      </div>
+
+      <!-- Slot B: dublagem -->
+      <div class="video-slot">
+        <div class="video-slot-header">
+          <div class="slot-label">
+            <span class="slot-badge badge-dub">DUB</span>
+            Vídeo com dublagem
+          </div>
+          <span class="slot-status" id="status-b">aguardando</span>
+        </div>
+        <div class="iframe-wrapper" id="wrapper-b">
+          <div class="placeholder" id="placeholder-b">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+            <span>Cole a URL e clique em Carregar</span>
+          </div>
+          <div id="player-b"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- transport -->
+    <div class="transport">
+      <button class="transport-btn primary" id="btn-play" onclick="playBoth()" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        Play
+      </button>
+      <button class="transport-btn" id="btn-pause" onclick="pauseBoth()" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        Pause
+      </button>
+      <button class="transport-btn danger" id="btn-stop" onclick="stopBoth()" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        Parar
+      </button>
+      <div class="time-display">
+        A <span id="time-a">0:00</span> &nbsp;·&nbsp; B <span id="time-b">0:00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── sidebar ── -->
+  <div class="sidebar">
+
+    <!-- URLs -->
+    <div class="sidebar-section">
+      <div class="section-title">URLs dos Vídeos</div>
+
+      <div class="field">
+        <label>Vídeo HD (sem som / mudo)</label>
+        <input type="text" id="url-a" placeholder="https://youtu.be/..." />
+      </div>
+      <div class="field">
+        <label>Vídeo Dublado (áudio ativo)</label>
+        <input type="text" id="url-b" placeholder="https://youtu.be/..." />
+      </div>
+      <button class="btn-load" onclick="loadVideos()">Carregar os dois vídeos</button>
+    </div>
+
+    <!-- Sync -->
+    <div class="sidebar-section">
+      <div class="section-title">Ajuste de Sincronismo</div>
+
+      <div class="sync-value-display">
+        <span id="sync-display">0</span> ms
+        <small id="sync-desc">Dublagem sincronizada</small>
+      </div>
+
+      <input type="range" class="sync-slider" id="sync-slider"
+             min="-5000" max="5000" value="0" step="100"
+             oninput="onSliderChange(this.value)" />
+
+      <div class="sync-buttons">
+        <button class="sync-btn" onclick="nudge(-500)">− 500ms</button>
+        <button class="sync-btn" onclick="nudge(-100)">− 100ms</button>
+        <button class="sync-btn" onclick="nudge(-10)">− 10ms</button>
+        <button class="sync-btn" onclick="nudge(+10)">+ 10ms</button>
+        <button class="sync-btn" onclick="nudge(+100)">+ 100ms</button>
+        <button class="sync-btn" onclick="nudge(+500)">+ 500ms</button>
+      </div>
+      <button class="btn-reset-sync" onclick="resetSync()">Zerar sincronismo</button>
+    </div>
+
+    <!-- Log -->
+    <div class="log">
+      <div class="log-title">Log de eventos</div>
+      <div id="log-output"></div>
+    </div>
+
+    <div class="info-strip">
+      <strong>Como funciona:</strong> o vídeo HD fica <strong>mudo</strong>; o dublado fica <strong>invisível</strong> mas com áudio. O ajuste de sincronismo adianta ou atrasa o dublado em relação ao HD.
+    </div>
+
+  </div>
+</main>
+
+<script>
+// ── YouTube IFrame API ──────────────────────────────────────────────
+let playerA = null; // HD (mudo, visível)
+let playerB = null; // Dublado (com som, oculto atrás do A)
+let readyA = false, readyB = false;
+let syncMs = 0;        // offset: B tocará syncMs ms à frente de A (negativo = B atrasado)
+let driftInterval = null;
+
+// Carrega a API do YouTube
+const tag = document.createElement('script');
+tag.src = 'https://www.youtube.com/iframe_api';
+document.head.appendChild(tag);
+
+function onYouTubeIframeAPIReady() {
+  log('YouTube IFrame API pronta.', 'ok');
+}
+
+// ── Utilitários ─────────────────────────────────────────────────────
+function extractId(url) {
+  const patterns = [
+    /(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/,
+    /^([A-Za-z0-9_-]{11})$/
+  ];
+  for (const p of patterns) {
+    const m = url.trim().match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function formatTime(sec) {
+  if (isNaN(sec) || sec < 0) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function log(msg, type = '') {
+  const el = document.getElementById('log-output');
+  const line = document.createElement('div');
+  line.className = `log-entry ${type}`;
+  const now = new Date();
+  line.textContent = `[${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(slot, text, active = false) {
+  const el = document.getElementById(`status-${slot}`);
+  el.textContent = text;
+  el.className = 'slot-status' + (active ? ' active' : '');
+}
+
+function setTransportEnabled(enabled) {
+  ['btn-play','btn-pause','btn-stop'].forEach(id => {
+    document.getElementById(id).disabled = !enabled;
+  });
+}
+
+// ── Carregar vídeos ─────────────────────────────────────────────────
+function loadVideos() {
+  const urlA = document.getElementById('url-a').value;
+  const urlB = document.getElementById('url-b').value;
+  const idA  = extractId(urlA);
+  const idB  = extractId(urlB);
+
+  if (!idA) { log('URL do vídeo HD inválida.', 'err'); return; }
+  if (!idB) { log('URL do vídeo Dublado inválida.', 'err'); return; }
+
+  log(`Carregando HD: ${idA}`, 'info');
+  log(`Carregando Dublado: ${idB}`, 'info');
+
+  // Destrói players anteriores se existirem
+  if (playerA) { try { playerA.destroy(); } catch(e){} }
+  if (playerB) { try { playerB.destroy(); } catch(e){} }
+  readyA = false; readyB = false;
+  setTransportEnabled(false);
+  setStatus('a', 'carregando...');
+  setStatus('b', 'carregando...');
+
+  document.getElementById('placeholder-a').style.display = 'none';
+  document.getElementById('placeholder-b').style.display = 'none';
+
+  // Player A — HD, visível, MUDO
+  playerA = new YT.Player('player-a', {
+    videoId: idA,
+    playerVars: { autoplay: 0, controls: 0, mute: 1, rel: 0, modestbranding: 1 },
+    events: {
+      onReady: () => {
+        playerA.mute();
+        readyA = true;
+        setStatus('a', 'pronto', true);
+        log('Player HD pronto.', 'ok');
+        checkBothReady();
+      },
+      onError: (e) => {
+        setStatus('a', 'erro ' + e.data);
+        log(`Erro no player HD: código ${e.data}`, 'err');
+      },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.PLAYING) setStatus('a', 'tocando ▶', true);
+        if (e.data === YT.PlayerState.PAUSED)  setStatus('a', 'pausado', false);
+      }
+    }
+  });
+
+  // Player B — Dublado, COM SOM, oculto (posição absoluta fora da tela via wrapper oculto)
+  // Ficará visualmente invisível mas com áudio ativo
+  const wrapperB = document.getElementById('wrapper-b');
+  wrapperB.style.visibility = 'hidden';
+  wrapperB.style.pointerEvents = 'none';
+
+  playerB = new YT.Player('player-b', {
+    videoId: idB,
+    playerVars: { autoplay: 0, controls: 0, mute: 0, rel: 0, modestbranding: 1 },
+    events: {
+      onReady: () => {
+        playerB.unMute();
+        playerB.setVolume(100);
+        readyB = true;
+        setStatus('b', 'pronto (áudio)', true);
+        log('Player Dublado pronto — áudio ativo.', 'ok');
+        checkBothReady();
+      },
+      onError: (e) => {
+        setStatus('b', 'erro ' + e.data);
+        log(`Erro no player Dublado: código ${e.data}`, 'err');
+        // Se o dublado não puder embedar, não tem como usar o áudio dele
+        if (e.data === 101 || e.data === 150) {
+          log('Este vídeo dublado bloqueou o embed — o áudio não pode ser capturado.', 'err');
+        }
+      },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.PLAYING) setStatus('b', 'áudio ativo ▶', true);
+        if (e.data === YT.PlayerState.PAUSED)  setStatus('b', 'pausado', false);
+      }
+    }
+  });
+}
+
+function checkBothReady() {
+  if (readyA && readyB) {
+    setTransportEnabled(true);
+    log('Ambos prontos. Clique em Play para começar.', 'ok');
+    startDriftCorrection();
+  }
+}
+
+// ── Transport ───────────────────────────────────────────────────────
+function playBoth() {
+  if (!readyA || !readyB) return;
+
+  // Calcula posições com o offset de sincronismo
+  const posA = playerA.getCurrentTime();
+  const offsetSec = syncMs / 1000;
+
+  playerA.playVideo();
+
+  // Aplica offset: se syncMs > 0, B está adiantado em relação a A
+  const targetB = Math.max(0, posA + offsetSec);
+  playerB.seekTo(targetB, true);
+  playerB.playVideo();
+
+  log(`Play — A: ${formatTime(posA)} | B: ${formatTime(targetB)} (offset ${syncMs > 0 ? '+' : ''}${syncMs}ms)`, 'info');
+}
+
+function pauseBoth() {
+  if (playerA) playerA.pauseVideo();
+  if (playerB) playerB.pauseVideo();
+  log('Pausado.', 'info');
+}
+
+function stopBoth() {
+  if (playerA) { playerA.stopVideo(); playerA.seekTo(0, true); }
+  if (playerB) { playerB.stopVideo(); playerB.seekTo(0, true); }
+  log('Parado e reiniciado.', 'info');
+}
+
+// ── Correção de drift ───────────────────────────────────────────────
+// A cada 3s compara a posição de A com a esperada de B e corrige se > 300ms de desvio
+function startDriftCorrection() {
+  if (driftInterval) clearInterval(driftInterval);
+  driftInterval = setInterval(() => {
+    if (!readyA || !readyB) return;
+    if (playerA.getPlayerState() !== YT.PlayerState.PLAYING) return;
+
+    const posA = playerA.getCurrentTime();
+    const posB = playerB.getCurrentTime();
+    const expectedB = posA + (syncMs / 1000);
+    const drift = Math.abs(posB - expectedB);
+
+    // Atualiza display de tempo
+    document.getElementById('time-a').textContent = formatTime(posA);
+    document.getElementById('time-b').textContent = formatTime(posB);
+
+    if (drift > 0.3) { // > 300ms de desvio → corrige
+      playerB.seekTo(expectedB, true);
+      log(`Drift corrigido: ${Math.round(drift * 1000)}ms → B ajustado para ${formatTime(expectedB)}`, 'info');
+    }
+  }, 3000);
+}
+
+// ── Sincronismo ─────────────────────────────────────────────────────
+function onSliderChange(val) {
+  syncMs = parseInt(val);
+  updateSyncDisplay();
+  applySync();
+}
+
+function nudge(deltaMs) {
+  syncMs = Math.max(-5000, Math.min(5000, syncMs + deltaMs));
+  document.getElementById('sync-slider').value = syncMs;
+  updateSyncDisplay();
+  applySync();
+}
+
+function resetSync() {
+  syncMs = 0;
+  document.getElementById('sync-slider').value = 0;
+  updateSyncDisplay();
+  applySync();
+}
+
+function updateSyncDisplay() {
+  document.getElementById('sync-display').textContent = (syncMs > 0 ? '+' : '') + syncMs;
+  let desc = 'Dublagem sincronizada';
+  if (syncMs > 0)  desc = `Dublagem ${syncMs}ms adiantada`;
+  if (syncMs < 0)  desc = `Dublagem ${Math.abs(syncMs)}ms atrasada`;
+  document.getElementById('sync-desc').textContent = desc;
+}
+
+function applySync() {
+  if (!readyA || !readyB) return;
+  const posA = playerA.getCurrentTime();
+  const targetB = Math.max(0, posA + (syncMs / 1000));
+  playerB.seekTo(targetB, true);
+  log(`Sync ajustado para ${(syncMs > 0 ? '+' : '') + syncMs}ms → B → ${formatTime(targetB)}`, 'info');
+}
+</script>
+</body>
+</html>
