@@ -398,7 +398,10 @@ header p  { font-size: 0.72rem; color: var(--muted); margin-left: 2px; }
           <button class="snudge pos" onclick="nudge(+2000)">+2s</button>
         </div>
         <button class="btn-zero" onclick="resetSync()">Zerar</button>
-        <button class="auto-drift-toggle off" id="btn-auto" onclick="toggleAuto()">Auto-correção: OFF</button>
+        <button class="tbtn" id="btn-apply" onclick="applyDriftOnce()" disabled>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"/></svg>
+          Corrigir agora
+        </button>
       </div>
     </div>
   </div>
@@ -410,7 +413,7 @@ header p  { font-size: 0.72rem; color: var(--muted); margin-left: 2px; }
 let playerA = null, playerB = null;
 let readyA = false, readyB = false;
 let syncMs  = 0;          // offset desejado: B deve estar syncMs/1000s à frente de A
-let autoCorrect = false;  // correção automática de drift (desligada por padrão)
+// auto-correção por limiar — controlada por correctCooldown (ver applyDriftOnce)
 let nudging = false;      // flag: usuário está ajustando — suspende auto-correção momentaneamente
 let nudgeTimer = null;
 let pollInterval = null;
@@ -500,6 +503,7 @@ function checkReady() {
   if (!readyA || !readyB) return;
   setTransport(true);
   document.getElementById('btn-fs').disabled = false;
+  document.getElementById('btn-apply').disabled = false;
 }
 
 // ── transport ─────────────────────────────────────────────────────
@@ -565,12 +569,35 @@ function updateSyncDisplay() {
     (syncMs === 0 ? '0' : (syncMs > 0 ? '+' : '') + syncMs) + ' ms';
 }
 
-// ── auto-correção ─────────────────────────────────────────────────
-function toggleAuto() {
-  autoCorrect = !autoCorrect;
-  const btn = document.getElementById('btn-auto');
-  btn.textContent = `Auto-correção: ${autoCorrect ? 'ON' : 'OFF'}`;
-  btn.className   = `auto-drift-toggle ${autoCorrect ? 'on' : 'off'}`;
+// ── correção única de drift ───────────────────────────────────────
+// Aplica a correção uma única vez e entra em cooldown — sem loop de overshooting
+let correctCooldown = false;
+let cooldownTimer   = null;
+const COOLDOWN_MS   = 4000; // espera 4s após cada correção antes de permitir outra
+const AUTO_THRESHOLD_MS = 150; // dispara se drift > 150ms
+
+function applyDriftOnce() {
+  if (!readyA || !readyB || correctCooldown) return;
+  const posA    = playerA.getCurrentTime();
+  const targetB = Math.max(0, posA + syncMs / 1000);
+  playerB.seekTo(targetB, true);
+  if (playerA.getPlayerState() === YT.PlayerState.PLAYING) playerB.playVideo();
+  enterCooldown();
+}
+
+function enterCooldown() {
+  correctCooldown = true;
+  const btn = document.getElementById('btn-apply');
+  btn.disabled = true;
+  btn.textContent = 'Aguardando...';
+  clearTimeout(cooldownTimer);
+  cooldownTimer = setTimeout(() => {
+    correctCooldown = false;
+    if (readyA && readyB) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83"/></svg> Corrigir agora';
+    }
+  }, COOLDOWN_MS);
 }
 
 // ── polling — mede posições e atualiza o medidor de drift ─────────
@@ -602,12 +629,11 @@ function poll() {
 
   updateDriftMeter(driftMs);
 
-  // Auto-correção: só age se ligada, não estiver ajustando manualmente,
-  // e o drift for grande o suficiente para perceber (> 300ms)
-  if (autoCorrect && !nudging && stateA === YT.PlayerState.PLAYING) {
-    if (Math.abs(driftMs) > 300) {
-      playerB.seekTo(Math.max(0, expectedB), true);
-      if (stateB !== YT.PlayerState.PLAYING) playerB.playVideo();
+  // Auto-correção única: dispara sozinha se drift ultrapassar o limiar,
+  // mas entra em cooldown após cada disparo — sem loop de overshooting
+  if (!nudging && !correctCooldown && stateA === YT.PlayerState.PLAYING) {
+    if (Math.abs(driftMs) > AUTO_THRESHOLD_MS) {
+      applyDriftOnce();
     }
   }
 }
